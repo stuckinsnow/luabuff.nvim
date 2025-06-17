@@ -20,9 +20,10 @@ local cache_valid = false
 local last_buffer_count = 0
 local last_current_buf = nil
 local last_mode = nil
-
--- Store the position map globally for keymap access
 local buffer_position_map = {}
+
+-- Initialize buffer movement module
+local buffer_movement = require("luabuff.buffer-movement")
 
 -- Check if we're in normal mode
 local function is_normal_mode()
@@ -459,7 +460,10 @@ function M.custom_buffers()
 	end)
 
 	-- Create position mapping
-	buffer_position_map = create_buffer_position_map(buffers)
+	buffer_position_map = create_buffer_position_map(buffers) -- Now updates the module variable
+
+	-- Setup buffer movement with current position map
+	buffer_movement.setup(buffer_position_map)
 
 	local current_buf = vim.api.nvim_get_current_buf()
 
@@ -581,7 +585,7 @@ function M.custom_buffers()
 		end
 
 		-- Make it clickable using position instead of buffer number
-		buffer_str = string.format("%%%d@v:lua.require'luabuff.nvim'.switch_to_buffer_by_position@%s%%T", i, buffer_str)
+		buffer_str = string.format("%%%d@v:lua.require'luabuff'.switch_to_buffer_by_position@%s%%T", i, buffer_str)
 
 		table.insert(buffer_strings, buffer_str)
 	end
@@ -610,11 +614,6 @@ function M.get_buffers()
 	return M.custom_buffers()
 end
 
--- Keep the original switch_to_buffer function for backward compatibility
-function M.switch_to_buffer(bufnr)
-	vim.api.nvim_set_current_buf(bufnr)
-end
-
 -- Expose function to get sorted buffers (same logic as used in custom_buffers)
 function M.get_sorted_buffers()
 	-- Get all valid buffers (both loaded and listed)
@@ -640,79 +639,28 @@ function M.get_sorted_buffers()
 	return buffers
 end
 
--- Navigate to previous buffer by position
 function M.goto_previous_buffer()
-	if vim.tbl_isempty(buffer_position_map) then
-		vim.cmd("bprevious")
-		return
-	end
-
-	local current_buf = vim.api.nvim_get_current_buf()
-	local current_position = nil
-
-	for pos, bufnr in pairs(buffer_position_map) do
-		if bufnr == current_buf then
-			current_position = pos
-			break
-		end
-	end
-
-	if not current_position then
-		vim.cmd("bprevious")
-		return
-	end
-
-	local total_buffers = vim.tbl_count(buffer_position_map)
-	local prev_position = current_position == 1 and total_buffers or current_position - 1
-
-	local prev_bufnr = buffer_position_map[prev_position]
-	if prev_bufnr and vim.api.nvim_buf_is_valid(prev_bufnr) then
-		vim.api.nvim_set_current_buf(prev_bufnr)
-	end
+	return buffer_movement.goto_previous_buffer()
 end
 
 -- Navigate to next buffer by position
 function M.goto_next_buffer()
-	if vim.tbl_isempty(buffer_position_map) then
-		vim.cmd("bnext")
-		return
-	end
-
-	local current_buf = vim.api.nvim_get_current_buf()
-	local current_position = nil
-
-	for pos, bufnr in pairs(buffer_position_map) do
-		if bufnr == current_buf then
-			current_position = pos
-			break
-		end
-	end
-
-	if not current_position then
-		vim.cmd("bnext")
-		return
-	end
-
-	local total_buffers = vim.tbl_count(buffer_position_map)
-	local next_position = current_position == total_buffers and 1 or current_position + 1
-
-	local next_bufnr = buffer_position_map[next_position]
-	if next_bufnr and vim.api.nvim_buf_is_valid(next_bufnr) then
-		vim.api.nvim_set_current_buf(next_bufnr)
-	end
+	return buffer_movement.goto_next_buffer()
 end
 
 -- Function to switch to buffer by position (for click handling)
 function M.switch_to_buffer_by_position(position)
-	local bufnr = buffer_position_map[position]
-	if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-		vim.api.nvim_set_current_buf(bufnr)
-	end
+	return buffer_movement.switch_to_buffer_by_position(position)
 end
 
 -- Function to get buffer by position (for keymaps)
 function M.get_buffer_by_position(position)
-	return buffer_position_map[position]
+	return buffer_movement.get_buffer_by_position(position)
+end
+
+-- Keep the original switch_to_buffer function for backward compatibility
+function M.switch_to_buffer(bufnr)
+	return buffer_movement.switch_to_buffer(bufnr)
 end
 
 -- Expose toggle pin function for keymaps
@@ -724,82 +672,6 @@ end
 
 setup_cache_events()
 
--- Keymaps
-local function setup_keymaps()
-	-- Change buffers using position-based navigation
-	vim.keymap.set("n", "<M-s>", function()
-		M.goto_previous_buffer()
-	end, { noremap = true, silent = true, desc = "Previous buffer by position" })
-
-	vim.keymap.set("n", "<M-f>", function()
-		M.goto_next_buffer()
-	end, { noremap = true, silent = true, desc = "Next buffer by position" })
-
-	-- Delete buffers to the left and right using the same sorting as lualine
-	local function delete_buffers(direction)
-		local current_buf = vim.api.nvim_get_current_buf()
-
-		-- Get the same sorted buffer list as used in lualine
-		local buffers = M.get_sorted_buffers()
-
-		-- Find current buffer's position in the sorted list
-		local current_index = nil
-		for i, buf_id in ipairs(buffers) do
-			if buf_id == current_buf then
-				current_index = i
-				break
-			end
-		end
-
-		if current_index then
-			if direction == "left" then
-				-- Delete buffers to the left
-				for i = 1, current_index - 1 do
-					if vim.api.nvim_buf_is_valid(buffers[i]) and not vim.bo[buffers[i]].modified then
-						vim.api.nvim_buf_delete(buffers[i], { force = false })
-					end
-				end
-			elseif direction == "right" then
-				-- Delete buffers to the right
-				for i = current_index + 1, #buffers do
-					if vim.api.nvim_buf_is_valid(buffers[i]) and not vim.bo[buffers[i]].modified then
-						vim.api.nvim_buf_delete(buffers[i], { force = false })
-					end
-				end
-			end
-		end
-	end
-
-	vim.keymap.set("n", "<leader>bl", function()
-		if vim.fn.exists(":AerialClose") == 2 then
-			vim.cmd("AerialClose")
-		end
-		delete_buffers("left")
-	end, { noremap = true, silent = true, desc = "Delete Buffers to the Left" })
-
-	vim.keymap.set("n", "<leader>br", function()
-		if vim.fn.exists(":AerialClose") == 2 then
-			vim.cmd("AerialClose")
-		end
-		delete_buffers("right")
-	end, { noremap = true, silent = true, desc = "Delete Buffers to the Right" })
-
-	-- Map Alt-1 through Alt-6 to switch to the corresponding buffer position
-	for i = 1, 6 do
-		vim.keymap.set("n", "<A-" .. i .. ">", function()
-			local bufnr = M.get_buffer_by_position(i)
-			if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-				vim.api.nvim_set_current_buf(bufnr)
-			end
-		end, { desc = "Go to buffer " .. i })
-	end
-
-	-- Pin/unpin current buffer
-	vim.keymap.set("n", "<leader>bp", function()
-		M.toggle_pin_current()
-	end, { desc = "Toggle pin current buffer" })
-end
-
-setup_keymaps()
+require("luabuff.keymaps").setup(M)
 
 return M
