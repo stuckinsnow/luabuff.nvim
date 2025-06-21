@@ -2,6 +2,8 @@
 
 A plugin which must be used in conjunction with lualine. This displays buffers with visual separators, and allows pinning support, diagnostic indicators, git status, and smart scrolling.
 
+Uploading 2025-06-21 11-55-12.mp4…
+
 ## ✨ Features
 
 - **Buffer Pinning**: Pin frequently used buffers to keep them at the front
