@@ -16,6 +16,8 @@ local config = {
 	pin_icon = "📌",
 	modified_icon = "●",
 	updatetime = 1000,
+	sort_by = "id", -- "id" or "modified"
+	sort_direction = "asc", -- "asc" or "desc"
 }
 
 -- Initialize buffer movement module
@@ -98,9 +100,30 @@ local function get_sorted_buffers()
 			return false
 		end
 
-		local a_order = custom_order[a] or a
-		local b_order = custom_order[b] or b
-		return a_order < b_order
+		-- Custom manual order takes priority
+		if custom_order[a] or custom_order[b] then
+			local a_order = custom_order[a] or a
+			local b_order = custom_order[b] or b
+			return a_order < b_order
+		end
+
+		if config.sort_by == "modified" then
+			local a_name = vim.api.nvim_buf_get_name(a)
+			local b_name = vim.api.nvim_buf_get_name(b)
+			local a_stat = a_name ~= "" and vim.uv.fs_stat(a_name)
+			local b_stat = b_name ~= "" and vim.uv.fs_stat(b_name)
+			local a_mtime = a_stat and a_stat.mtime.sec or 0
+			local b_mtime = b_stat and b_stat.mtime.sec or 0
+			if config.sort_direction == "desc" then
+				return a_mtime < b_mtime
+			end
+			return a_mtime > b_mtime
+		end
+
+		if config.sort_direction == "desc" then
+			return a > b
+		end
+		return a < b
 	end)
 
 	return buffers
@@ -188,6 +211,20 @@ end
 -- User commands
 vim.api.nvim_create_user_command("LuaBuffMoveLeft", function() M.move_buffer(-1) end, { desc = "Move buffer left" })
 vim.api.nvim_create_user_command("LuaBuffMoveRight", function() M.move_buffer(1) end, { desc = "Move buffer right" })
+vim.api.nvim_create_user_command("LuaBuffSortBy", function(opts)
+	local args = vim.split(opts.args, "%s+")
+	config.sort_by = args[1]
+	if args[2] == "asc" or args[2] == "desc" then
+		config.sort_direction = args[2]
+	end
+	custom_order = {}
+	cache.invalidate()
+	require("lualine").refresh()
+end, { nargs = "+", complete = function(_, line)
+	local args = vim.split(line, "%s+")
+	if #args <= 2 then return { "id", "modified" } end
+	return { "asc", "desc" }
+end, desc = "Set buffer sort order" })
 
 -- Setup keymaps
 require("luabuff.keymaps").setup(M)

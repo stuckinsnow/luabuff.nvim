@@ -51,6 +51,8 @@ require("luabuff").setup({
   pin_icon = "📌",                -- Icon shown for pinned buffers
   modified_icon = "●",            -- Icon shown for modified buffers
   updatetime = 1000,              -- Update frequency in milliseconds
+  sort_by = "id",                 -- Sort order: "id" (buffer number) or "modified" (file modification time)
+  sort_direction = "asc",         -- Sort direction: "asc" or "desc"
 })
 ```
 
@@ -65,6 +67,8 @@ require("luabuff").setup({
 | `pin_icon`            | string | `"📌"`                   | Icon displayed next to pinned buffers       |
 | `modified_icon`       | string | `"●"`                    | Icon displayed next to modified buffers     |
 | `updatetime`          | number | `1000`                   | Cache refresh interval in milliseconds      |
+| `sort_by`             | string | `"id"`                   | Sort order: `"id"` or `"modified"`          |
+| `sort_direction`      | string | `"asc"`                  | Sort direction: `"asc"` or `"desc"`         |
 
 ## 🎨 Lualine Integration
 
