@@ -58,6 +58,29 @@ buffer_renderer.setup({
 	is_pinned = pin_manager.is_pinned,
 })
 
+-- Custom buffer order: maps bufnr -> sort index for manual reordering
+local custom_order = {}
+local positions_key = "LuaBuffPositions"
+
+-- Restore buffer order from vim.g
+local function restore_positions()
+	local str = vim.g[positions_key]
+	if not str then return end
+	local ok, paths = pcall(vim.fn.json_decode, str)
+	if not ok or type(paths) ~= "table" or #paths == 0 then return end
+	custom_order = {}
+	for i, path in ipairs(paths) do
+		local bufnr = vim.fn.bufnr("^" .. vim.fn.fnameescape(path) .. "$")
+		if bufnr ~= -1 then
+			custom_order[bufnr] = i
+		end
+	end
+end
+
+vim.api.nvim_create_autocmd("BufRead", {
+	callback = function() restore_positions() end,
+})
+
 -- Get sorted buffers helper
 local function get_sorted_buffers()
 	local buffers = vim.tbl_filter(function(buf)
@@ -75,10 +98,19 @@ local function get_sorted_buffers()
 			return false
 		end
 
-		return a < b
+		local a_order = custom_order[a] or a
+		local b_order = custom_order[b] or b
+		return a_order < b_order
 	end)
 
 	return buffers
+end
+
+-- Save buffer order as file paths to vim.g (persisted by session plugins)
+local function save_positions()
+	local buffers = get_sorted_buffers()
+	local paths = vim.tbl_map(function(id) return vim.api.nvim_buf_get_name(id) end, buffers)
+	vim.g[positions_key] = vim.fn.json_encode(paths)
 end
 
 -- Main function to get custom buffers
@@ -120,6 +152,42 @@ end
 function M.toggle_pin_current()
 	pin_manager.toggle_pin_current()
 end
+
+-- Move current buffer left or right in the display order
+function M.move_buffer(direction)
+	local buffers = get_sorted_buffers()
+	local current_buf = vim.api.nvim_get_current_buf()
+	local idx
+	for i, b in ipairs(buffers) do
+		if b == current_buf then
+			idx = i
+			break
+		end
+	end
+	if not idx then
+		return
+	end
+
+	local swap_idx = idx + direction
+	if swap_idx < 1 or swap_idx > #buffers then
+		return
+	end
+
+	-- Ensure both buffers have explicit order values, then swap
+	for i, b in ipairs(buffers) do
+		if not custom_order[b] then
+			custom_order[b] = i
+		end
+	end
+	custom_order[buffers[idx]], custom_order[buffers[swap_idx]] = custom_order[buffers[swap_idx]], custom_order[buffers[idx]]
+	save_positions()
+	cache.invalidate()
+	require("lualine").refresh()
+end
+
+-- User commands
+vim.api.nvim_create_user_command("LuaBuffMoveLeft", function() M.move_buffer(-1) end, { desc = "Move buffer left" })
+vim.api.nvim_create_user_command("LuaBuffMoveRight", function() M.move_buffer(1) end, { desc = "Move buffer right" })
 
 -- Setup keymaps
 require("luabuff.keymaps").setup(M)

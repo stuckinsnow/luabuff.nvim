@@ -118,6 +118,15 @@ end, { desc = 'Next buffer' })
 vim.keymap.set('n', '<your-key>', function()
   require('luabuff').toggle_pin_current()
 end, { desc = 'Toggle pin buffer' })
+
+-- Move buffer order (reorder buffers in the bufferline)
+vim.keymap.set('n', '<C-h>', function()
+  require('luabuff').move_buffer(-1)
+end, { desc = 'Move buffer left' })
+
+vim.keymap.set('n', '<C-l>', function()
+  require('luabuff').move_buffer(1)
+end, { desc = 'Move buffer right' })
 ```
 
 ## 🎯 Functions
@@ -130,6 +139,7 @@ end, { desc = 'Toggle pin buffer' })
 | `goto_next_buffer()`                | Navigate to next buffer by position            |
 | `goto_previous_buffer()`            | Navigate to previous buffer by position        |
 | `toggle_pin_current()`              | Toggle pin status of current buffer            |
+| `move_buffer(direction)`            | Move current buffer left (-1) or right (1)     |
 | `get_buffer_by_position(pos)`       | Get buffer number at specific position         |
 | `switch_to_buffer_by_position(pos)` | Switch to buffer at position (used for clicks) |
 
