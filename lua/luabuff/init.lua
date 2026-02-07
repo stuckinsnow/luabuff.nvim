@@ -25,7 +25,9 @@ local buffer_movement = require("luabuff.buffer-movement")
 
 -- Setup function
 function M.setup(opts)
-	config = vim.tbl_deep_extend("force", config, opts or {})
+	for k, v in pairs(vim.tbl_deep_extend("force", config, opts or {})) do
+		config[k] = v
+	end
 
 	-- Setup cache events
 	cache.setup_events(config)
@@ -70,7 +72,7 @@ local function restore_positions()
 	if not str then return end
 	local ok, paths = pcall(vim.fn.json_decode, str)
 	if not ok or type(paths) ~= "table" or #paths == 0 then return end
-	custom_order = {}
+	for k in pairs(custom_order) do custom_order[k] = nil end
 	for i, path in ipairs(paths) do
 		local bufnr = vim.fn.bufnr("^" .. vim.fn.fnameescape(path) .. "$")
 		if bufnr ~= -1 then
@@ -209,22 +211,7 @@ function M.move_buffer(direction)
 end
 
 -- User commands
-vim.api.nvim_create_user_command("LuaBuffMoveLeft", function() M.move_buffer(-1) end, { desc = "Move buffer left" })
-vim.api.nvim_create_user_command("LuaBuffMoveRight", function() M.move_buffer(1) end, { desc = "Move buffer right" })
-vim.api.nvim_create_user_command("LuaBuffSortBy", function(opts)
-	local args = vim.split(opts.args, "%s+")
-	config.sort_by = args[1]
-	if args[2] == "asc" or args[2] == "desc" then
-		config.sort_direction = args[2]
-	end
-	custom_order = {}
-	cache.invalidate()
-	require("lualine").refresh()
-end, { nargs = "+", complete = function(_, line)
-	local args = vim.split(line, "%s+")
-	if #args <= 2 then return { "id", "modified" } end
-	return { "asc", "desc" }
-end, desc = "Set buffer sort order" })
+require("luabuff.commands").setup(M, config, get_sorted_buffers, custom_order, save_positions)
 
 -- Setup keymaps
 require("luabuff.keymaps").setup(M)

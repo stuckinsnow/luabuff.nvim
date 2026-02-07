@@ -131,6 +131,11 @@ end, { desc = 'Move buffer left' })
 vim.keymap.set('n', '<C-l>', function()
   require('luabuff').move_buffer(1)
 end, { desc = 'Move buffer right' })
+
+-- Sort buffers
+vim.keymap.set('n', '<leader>bs', '<cmd>LuaBuffSortBy id asc<CR>', { desc = 'Sort buffers by ID' })
+vim.keymap.set('n', '<leader>bm', '<cmd>LuaBuffSortBy modified asc<CR>', { desc = 'Sort buffers by modified' })
+vim.keymap.set('n', '<leader>bg', '<cmd>LuaBuffSortByGitDate<CR>', { desc = 'Sort buffers by git date' })
 ```
 
 ## 🎯 Functions
