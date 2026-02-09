@@ -85,7 +85,13 @@ function M.setup_events(config)
 		"BufModifiedSet",
 	}, {
 		group = group,
-		callback = M.invalidate,
+		callback = function()
+			M.invalidate()
+			-- Force refresh on buffer add/delete to show immediately
+			vim.schedule(function()
+				require("lualine").refresh()
+			end)
+		end,
 	})
 
 	-- Handle window events
