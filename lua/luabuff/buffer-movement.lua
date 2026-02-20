@@ -1,5 +1,17 @@
 local M = {}
 
+local function safe_switch(bufnr)
+	if not bufnr or not vim.api.nvim_buf_is_valid(bufnr) then
+		return false
+	end
+	local ok = pcall(vim.api.nvim_set_current_buf, bufnr)
+	if not ok then
+		pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
+		return false
+	end
+	return true
+end
+
 function M.setup(position_map)
 	-- Navigate to previous buffer by position
 	function M.goto_previous_buffer()
@@ -26,9 +38,12 @@ function M.setup(position_map)
 		local total_buffers = vim.tbl_count(position_map)
 		local prev_position = current_position == 1 and total_buffers or current_position - 1
 
-		local prev_bufnr = position_map[prev_position]
-		if prev_bufnr and vim.api.nvim_buf_is_valid(prev_bufnr) then
-			vim.api.nvim_set_current_buf(prev_bufnr)
+		for _ = 1, total_buffers do
+			local prev_bufnr = position_map[prev_position]
+			if safe_switch(prev_bufnr) then
+				return
+			end
+			prev_position = prev_position == 1 and total_buffers or prev_position - 1
 		end
 	end
 
@@ -57,18 +72,19 @@ function M.setup(position_map)
 		local total_buffers = vim.tbl_count(position_map)
 		local next_position = current_position == total_buffers and 1 or current_position + 1
 
-		local next_bufnr = position_map[next_position]
-		if next_bufnr and vim.api.nvim_buf_is_valid(next_bufnr) then
-			vim.api.nvim_set_current_buf(next_bufnr)
+		for _ = 1, total_buffers do
+			local next_bufnr = position_map[next_position]
+			if safe_switch(next_bufnr) then
+				return
+			end
+			next_position = next_position == total_buffers and 1 or next_position + 1
 		end
 	end
 
 	-- Function to switch to buffer by position (for click handling)
 	function M.switch_to_buffer_by_position(position)
 		local bufnr = position_map[position]
-		if bufnr and vim.api.nvim_buf_is_valid(bufnr) then
-			vim.api.nvim_set_current_buf(bufnr)
-		end
+		safe_switch(bufnr)
 	end
 
 	-- Function to get buffer by position (for keymaps)
@@ -78,7 +94,7 @@ function M.setup(position_map)
 
 	-- Keep the original switch_to_buffer function for backward compatibility
 	function M.switch_to_buffer(bufnr)
-		vim.api.nvim_set_current_buf(bufnr)
+		safe_switch(bufnr)
 	end
 end
 
