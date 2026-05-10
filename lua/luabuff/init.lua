@@ -20,22 +20,17 @@ local config = {
 	sort_direction = "asc", -- "asc" or "desc"
 }
 
--- Initialize buffer movement module
 local buffer_movement = require("luabuff.buffer-movement")
 
--- Setup function
 function M.setup(opts)
 	for k, v in pairs(vim.tbl_deep_extend("force", config, opts or {})) do
 		config[k] = v
 	end
 
-	-- Setup cache events
 	cache.setup_events(config)
 
-	-- Setup pin manager
 	pin_manager.setup(config)
 
-	-- Set updatetime
 	if vim.o.updatetime > config.updatetime then
 		vim.o.updatetime = config.updatetime
 	end
@@ -69,10 +64,16 @@ local positions_key = "LuaBuffPositions"
 -- Restore buffer order from vim.g
 local function restore_positions()
 	local str = vim.g[positions_key]
-	if not str then return end
+	if not str then
+		return
+	end
 	local ok, paths = pcall(vim.fn.json_decode, str)
-	if not ok or type(paths) ~= "table" or #paths == 0 then return end
-	for k in pairs(custom_order) do custom_order[k] = nil end
+	if not ok or type(paths) ~= "table" or #paths == 0 then
+		return
+	end
+	for k in pairs(custom_order) do
+		custom_order[k] = nil
+	end
 	for i, path in ipairs(paths) do
 		local bufnr = vim.fn.bufnr("^" .. vim.fn.fnameescape(path) .. "$")
 		if bufnr ~= -1 then
@@ -82,10 +83,11 @@ local function restore_positions()
 end
 
 vim.api.nvim_create_autocmd("BufRead", {
-	callback = function() restore_positions() end,
+	callback = function()
+		restore_positions()
+	end,
 })
 
--- Get sorted buffers helper
 local function get_sorted_buffers()
 	local buffers = vim.tbl_filter(function(buf)
 		return vim.bo[buf].buflisted and vim.api.nvim_buf_is_valid(buf)
@@ -131,10 +133,11 @@ local function get_sorted_buffers()
 	return buffers
 end
 
--- Save buffer order as file paths to vim.g (persisted by session plugins)
 local function save_positions()
 	local buffers = get_sorted_buffers()
-	local paths = vim.tbl_map(function(id) return vim.api.nvim_buf_get_name(id) end, buffers)
+	local paths = vim.tbl_map(function(id)
+		return vim.api.nvim_buf_get_name(id)
+	end, buffers)
 	vim.g[positions_key] = vim.fn.json_encode(paths)
 end
 
@@ -145,7 +148,6 @@ function M.custom_buffers()
 	return buffer_renderer.render_buffers(buffers, buffer_position_map, buffer_movement)
 end
 
--- Export functions
 function M.get_buffers()
 	return M.custom_buffers()
 end
@@ -178,36 +180,10 @@ function M.toggle_pin_current()
 	pin_manager.toggle_pin_current()
 end
 
--- Move current buffer left or right in the display order
+local buffer_order = require("luabuff.buffer-order")
+
 function M.move_buffer(direction)
-	local buffers = get_sorted_buffers()
-	local current_buf = vim.api.nvim_get_current_buf()
-	local idx
-	for i, b in ipairs(buffers) do
-		if b == current_buf then
-			idx = i
-			break
-		end
-	end
-	if not idx then
-		return
-	end
-
-	local swap_idx = idx + direction
-	if swap_idx < 1 or swap_idx > #buffers then
-		return
-	end
-
-	-- Ensure both buffers have explicit order values, then swap
-	for i, b in ipairs(buffers) do
-		if not custom_order[b] then
-			custom_order[b] = i
-		end
-	end
-	custom_order[buffers[idx]], custom_order[buffers[swap_idx]] = custom_order[buffers[swap_idx]], custom_order[buffers[idx]]
-	save_positions()
-	cache.invalidate()
-	require("lualine").refresh()
+	buffer_order.move_buffer(direction, get_sorted_buffers, custom_order, save_positions)
 end
 
 -- User commands
