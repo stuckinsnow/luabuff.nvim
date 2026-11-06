@@ -26,15 +26,13 @@ https://github.com/user-attachments/assets/bd047d73-7b07-42e1-8728-9e5ac07d4235
   dir = vim.fn.stdpath("config") .. "/lua/luabuff",
   lazy = false,
   priority = 1000,
-  config = function()
-    require("luabuff").setup({
+  opts = {
       max_visible_buffers = 6,
       active_separators = "",
       inactive_separators = "╲",
       pin_icon = "📌",
       modified_icon = "●",
-    })
-  end,
+  }
 }
 ```
 
@@ -86,7 +84,6 @@ require('lualine').setup({
         function()
           return require('luabuff').get_buffers()
         end,
-        separator = '',
       }
     },
     lualine_x = {'encoding', 'fileformat', 'filetype'},
